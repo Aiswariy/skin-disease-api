@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Skin Disease Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>                    
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        header {
+            background: #ff0090;
+            color: rgba(255, 255, 255, 0.925);
+            padding: 20px;
+            text-align: center;
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+
+        nav {
+            text-align: center;
+            padding: 15px;
+            background: #b50088;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            padding: 12px 25px;
+            display: inline-block;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            background: #990061;
+            border-radius: 5px;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            border: 2px dashed #ff00a6;
+            border-radius: 8px;
+            background: #eef5ff;
+            cursor: pointer;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background-color: #ff00d0;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #b30086;
+        }
+
+        .content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        #uploadedImage {
+            display: none;
+            margin-top: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+            max-width: 100%;
+        }
+
+        #video {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 15px;
+            background: #ff008c;
+            color: white;
+            font-weight: 500;
+            margin-top: 20px;
+        }
+
+        .pink-heading {
+           color: rgba(147, 5, 130, 0.974);
+           font-weight: bold;
+        }
+
+    </style>
+
+    <script>
+        let videoStream;
+
+        function startCamera() {
+    let video = document.getElementById("video");
+    let captureButton = document.getElementById("captureButton");
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+        console.log("Camera access granted"); // Debugging log
+        videoStream = stream;
+        video.srcObject = stream;
+        video.style.display = "block";
+        captureButton.style.display = "block";
+            })
+    .catch(error => {
+        console.error("Camera Error:", error); // Debugging log
+        alert("Camera access denied or not supported");
+            });
+        }
+
+
+        function takePicture() {
+            let video = document.getElementById("video");
+            let canvas = document.createElement("canvas");
+            let fileInput = document.getElementById("fileInput");
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            videoStream.getTracks().forEach(track => track.stop());
+            video.style.display = "none";
+            document.getElementById("captureButton").style.display = "none";
+            
+            canvas.toBlob(blob => {
+                let file = new File([blob], "captured-image.jpg", { type: "image/jpeg" });
+                let dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+                uploadImage();
+            }, "image/jpeg");
+        }
+    </script>
+    <script>
+        function uploadImage() {
+            console.log("Upload button clicked!"); // Debugging log
+            let formData = new FormData();
+            let fileInput = document.getElementById("fileInput");
+            let resultDiv = document.getElementById("result");
+    
+            if (fileInput.files.length === 0) {
+                alert("Please select an image file.");
+                return;
+            }
+    
+            formData.append("file", fileInput.files[0]);
+            console.log("File selected:", fileInput.files[0]); // Debugging log
+    
+            resultDiv.innerHTML = "Processing...";
+    
+            fetch("/predict", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Server Response:", data); // Debugging log
+            if (data.error) {
+                resultDiv.innerHTML = "Error: " + data.error;
+            } else {
+                resultDiv.innerHTML = 
+    "Predicted Class: <strong>" + data.disease + "</strong><br>Confidence: <strong>" + 
+    (data.confidence * 100).toFixed(2) + "%</strong><br><br>" +
+    "<strong class='pink-heading'>Symptoms:</strong> " + data.details.Symptoms + "<br>" +
+    "<strong class='pink-heading'>Possible Causes:</strong> " + data.details["Possible Causes"] + "<br>" +
+    "<strong class='pink-heading'>Treatment:</strong> " + data.details.Treatment;
+
+                let uploadedImage = document.getElementById("uploadedImage");
+                uploadedImage.src = "/static/uploads/" + fileInput.files[0].name;
+                uploadedImage.style.display = "block";
+            }
+        })
+        .catch(error => {
+            console.error("Fetch Error:", error);
+            resultDiv.innerHTML = "An error occurred. Please try again.";
+        });
+    }
+    
+
+    function getUserLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(success, error, {
+            enableHighAccuracy: true, 
+            timeout: 10000, 
+            maximumAge: 0 
+        });
+    } else {
+        alert("Geolocation is not supported by this browser.");
+    }
+}
+
+
+function success(position) {
+    let latitude = position.coords.latitude;
+    let longitude = position.coords.longitude;
+    console.log("Detected Location:", latitude, longitude); // Debugging
+    getAddressFromCoordinates(latitude, longitude);
+}
+
+
+
+function error() {
+    alert("Unable to retrieve your location.");
+}
+
+function getAddressFromCoordinates(lat, lng) {
+    let apiKey = "e8d9f98a84484492b61d30adac42ea0c"; 
+    let url = `https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lng}&key=${apiKey}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log("OpenCage API Response:", data);  // Debugging log
+            if (!data.results || data.results.length === 0) {
+                console.error("No address found.");
+                return;
+            }
+            let components = data.results[0].components;
+            let city = components._normalized_city || components.city || components.town || components.county || components.state_district;
+            document.getElementById("location").innerHTML = `You are in ${city}, ${components.country}`;
+            findNearbyDermatologists(lat, lng);
+        })
+        .catch(error => console.error("Error fetching address:", error));
+}
+
+
+function findNearbyDermatologists(lat, lng) {
+    let query = `
+        [out:json];
+        (
+            node["healthcare"="doctor"](around:5000, ${lat}, ${lng});
+            node["healthcare"="clinic"](around:5000, ${lat}, ${lng});
+            node["speciality"="dermatology"](around:5000, ${lat}, ${lng});
+        );
+        out;
+    `;
+    
+    let url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            console.log("Overpass API Response:", data); // Debug log
+            if (!data.elements || data.elements.length === 0) {
+                console.log("No dermatologists found in the API response.");
+            }
+            displayResults(data.elements);
+        })
+        .catch(error => console.error("Error fetching data:", error));
+}
+
+function displayResults(results) {
+    let output = document.getElementById("results");
+    output.innerHTML = ""; // Clear previous results
+
+    if (!results || results.length === 0) {
+        output.innerHTML = "<p>No dermatologists found nearby.</p>";
+        return;
+    }
+
+    results.forEach(place => {
+        let name = place.tags.name || "Unknown Clinic";
+        let lat = place.lat;
+        let lng = place.lon; // Fix: Change `lng` to `lon`
+
+        output.innerHTML += `<div>
+            <h3>${name}</h3>
+            <p>Location: ${lat}, ${lng}</p>
+            <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=15" target="_blank">View on Map</a>
+        </div><hr>`;
+    });
+}
+
+
+    </script>
+    
+</head>
+
+
+<body>
+    <header>Skin Disease Detection</header>
+    <nav>
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#features">Features</a>
+        <a href="#contact">Contact</a>
+    </nav>
+    <div class="container" id="home">
+        <h2>Skin Disease Detection</h2> 
+        <button onclick="startCamera()">Capture Photo</button>
+        <video id="video" autoplay></video>
+        <button id="captureButton" onclick="takePicture()" style="display:none;">Take Picture</button>
+        <input type="file" id="fileInput" accept="image/*">
+        <button onclick="uploadImage()">Upload and Predict</button>
+        <div id="result"></div>
+        <img id="uploadedImage" src="" width="300">
+    </div>
+
+    <button onclick="getUserLocation()">Find Nearby Dermatologists</button>
+<p id="location"></p>
+<div id="results"></div>
+
+    <div class="content" id="about">
+        <h2>About</h2>
+        <p>Our system detects various skin diseases with high accuracy, aiding in early diagnosis and treatment.</p>
+    </div>
+    <div class="content" id="features">
+        <h2>Features</h2>
+        <ul>
+            <li>Skin image analysis</li>
+            <li>Fast and accurate predictions</li>
+            <li>Detailed confidence levels</li>
+            <li>User-friendly interface</li>
+        </ul>
+    </div>
+    <div class="content" id="contact">
+        <h2>Contact</h2>
+        <p>For inquiries, email us at <strong>22l205@psgtech.ac.in or 22l204@psgtech.ac.in</strong></p>
+    </div>
+    <footer>
+        &copy; 2025 Skin Disease Detection | All Rights Reserved
+    </footer>
+</body>
+</html>
