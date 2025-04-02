@@ -5,3 +5,4 @@ opencv-python
 pillow
 werkzeug
 requests
+gunicorn
